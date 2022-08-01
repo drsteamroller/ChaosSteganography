@@ -14,10 +14,6 @@ def startP():
 def nextCoord(R, X):
 	return (R * X * (1 - X))
 
-# Helper function to pick between 0 - red, 1 - green, or 2 - blue
-def pickRGB():
-	return floor(rand.random() * 3)
-
 # Short for determine bit insert. If the LSB and the input bit are the same,
 # do nothing (return 0) otherwise, subtract 1 if our bit is 0 and add one if it's 1
 def detBitInsert(bit, rgbval):
@@ -32,7 +28,7 @@ def detBitInsert(bit, rgbval):
 
 # I'm not exactly sure if this helps, but this makes sure we use exactly 3
 # significant features since float values in code are not exact.
-def round_sig(x, sig=3):
+def round_sig(x, sig=6):
 	return round(x, sig-int(floor(log10(abs(x))))-1)
 
 # This is highly assumptive that the user input is of the format
@@ -53,27 +49,29 @@ inbinary = ""
 for x in filecontents:
 	inbinary += str(format(ord(x), '08b'))
 
-# Pick a starting point for the rates and x & y coordinates
+# Pick a starting point for the rates and x & y coordinates as well as rgb
 sX = startP()
 rateX, x = sX[0], sX[1]
 
 sY = startP()
 rateY, y = sY[0], sY[1]
 
+sRGB = startP()
+rateRGB, rp = sRGB[0], sRGB[1]
+
+lines = [str(rateX), "\n", str(x), "\n", str(rateY), "\n", str(y), "\n", \
+	str(rateRGB), "\n", str(rp), "\n", str(len(inbinary))]
+
 # Open or create a key file that contains the starting values
 with open("key.txt", 'w') as keyfile:
-	keyfile.writelines([str(rateX), "\n", str(x), "\n", str(rateY), "\n", str(y), "\n"])
+	keyfile.writelines(lines)
 
 # Load the pixel map of rgb values and store the width and height of the image
 pixel_map = im.load()
 WIDTH, HEIGHT = im.size
 
-# stores 0, 1, 2 for r, g, b respectively for each bit inserted
-rgbStream = []
-
-# Error checking list that grabs all the coordinates so I can compare
-# it to when the reverse process runs (purely for debugging)
-coords = []
+# DEBUGGING VARS HERE
+rgbACT = ""
 
 # For each bit in the supplied message, find a coordinate in the image,
 # then determine if we need to change the LSB, and then change it in the
@@ -83,36 +81,31 @@ for bit in inbinary:
 	xpix = floor(round_sig(x) * WIDTH)
 	ypix = floor(round_sig(y) * HEIGHT)
 
-	coords.append((xpix,ypix))
-
 	r, g, b, p = im.getpixel((xpix, ypix))
 	
-	rgb = pickRGB()
-	rgbStream.append(rgb)
+	rgb = floor(rp * 3)
 
 	if rgb == 0:
 		val = detBitInsert(bit, r)
 		r = r+val
+		rgbACT += "Red: {}\n".format(r)
 	elif rgb == 1:
 		val = detBitInsert(bit, g)
 		g = g+val
+		rgbACT += "Green: {}\n".format(g)
 	else:
 		val = detBitInsert(bit, b)
 		b = b+val
+		rgbACT += "Blue: {}\n".format(b)
 
 	pixel_map[xpix,ypix] = (r, g, b)
 	x = nextCoord(round_sig(rateX), round_sig(x))
 	y = nextCoord(round_sig(rateY), round_sig(y))
-
-# Append the rgbStream into the key file (will replace with its own
-# chaos function implementation to cut down key file size)
-with open("key.txt", 'a') as keyfile:
-	keyfile.write(str(rgbStream))
+	rp = nextCoord(round_sig(rateRGB), round_sig(rp))
 
 # More debugging
-with open("stego_coords.txt", 'w') as coordfile:
-	for i in coords:
-		coordfile.write(str(i) + "\n")
+with open("debug_s.txt", 'w') as dbgfile:
+	dbgfile.write(rgbACT)
 
 # Save the stego-image
 im.save(".".join(stegoImage), formats=[pic[1]])
